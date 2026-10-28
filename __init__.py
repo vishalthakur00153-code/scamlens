@@ -1,1 +1,1 @@
-"""Detection rules for messages and URLs."""
+"""Test suite for ScamLens."""
