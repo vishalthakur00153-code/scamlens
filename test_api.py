@@ -13,6 +13,11 @@ def test_health_check_endpoint():
     assert data["service"] == "ScamLens"
     assert "stateless" in data["storage"]
 
+    # Also test /health endpoint for Render health checks
+    render_health = client.get("/health")
+    assert render_health.status_code == 200
+    assert render_health.json()["status"] == "healthy"
+
 
 def test_scan_message_endpoint_suspicious():
     payload = {

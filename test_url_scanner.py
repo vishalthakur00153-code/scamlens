@@ -117,6 +117,15 @@ def test_suspicious_raw_ip_address_host():
     assert "URL_RAW_IP_HOST" in indicator_ids
 
 
+def test_suspicious_raw_ipv6_address_host():
+    url = "http://[2001:db8::1]:8080/secure/bank-login"
+    result = analyze_url(url)
+    assert result.risk_level == "Suspicious"
+    indicator_ids = [i.id for i in result.indicators]
+    assert "URL_RAW_IP_HOST" in indicator_ids
+    assert "URL_IP_HOST_WITH_CREDENTIAL_LURE" in indicator_ids
+
+
 def test_suspicious_punycode_lookalike():
     url = "https://xn--pple-43d.com/support/login"
     result = analyze_url(url)

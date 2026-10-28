@@ -48,7 +48,8 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
-@app.get("/api/health", summary="Health check")
+@app.get("/health", summary="Health check")
+@app.get("/api/health", summary="API health check")
 def health_check():
     """Returns the operational status of the ScamLens detection engine."""
     return {

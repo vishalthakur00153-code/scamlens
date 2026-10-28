@@ -106,6 +106,20 @@ function setupSampleButtons() {
 function setupInputs() {
   messageInput.addEventListener("input", updateCharCount);
 
+  messageInput.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      scanMessageBtn.click();
+    }
+  });
+
+  urlInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      scanUrlBtn.click();
+    }
+  });
+
   clearMessageBtn.addEventListener("click", () => {
     messageInput.value = "";
     updateCharCount();
@@ -298,24 +312,49 @@ function setupReportActions() {
     if (!lastScanResult) return;
 
     const report = formatReportMarkdown(lastScanResult);
-    navigator.clipboard.writeText(report).then(
-      () => {
-        const originalText = copyReportBtn.innerHTML;
-        copyReportBtn.innerHTML = `✓ Copied to Clipboard`;
-        setTimeout(() => {
-          copyReportBtn.innerHTML = originalText;
-        }, 2000);
-      },
-      (err) => {
-        alert("Failed to copy report to clipboard.");
-      }
-    );
+    const setSuccessMessage = () => {
+      const originalText = copyReportBtn.innerHTML;
+      copyReportBtn.innerHTML = `✓ Copied to Clipboard`;
+      setTimeout(() => {
+        copyReportBtn.innerHTML = originalText;
+      }, 2000);
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(report).then(
+        setSuccessMessage,
+        () => fallbackCopy(report, setSuccessMessage)
+      );
+    } else {
+      fallbackCopy(report, setSuccessMessage);
+    }
   });
 
   scanNewBtn.addEventListener("click", () => {
     resultsContainer.style.display = "none";
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
+}
+
+function fallbackCopy(text, onSuccess) {
+  try {
+    const tempTextArea = document.createElement("textarea");
+    tempTextArea.value = text;
+    tempTextArea.style.position = "fixed";
+    tempTextArea.style.opacity = "0";
+    document.body.appendChild(tempTextArea);
+    tempTextArea.focus();
+    tempTextArea.select();
+    const successful = document.execCommand("copy");
+    document.body.removeChild(tempTextArea);
+    if (successful && onSuccess) {
+      onSuccess();
+    } else {
+      alert("Please copy the report text manually.");
+    }
+  } catch (err) {
+    alert("Could not copy report to clipboard.");
+  }
 }
 
 function formatReportMarkdown(result) {
