@@ -22,7 +22,7 @@ const SAMPLE_URLS = {
 
 // URL of the hosted ScamLens Python backend, e.g. "https://scamlens-api.onrender.com".
 // Leave empty when the Python server itself serves this page (e.g. http://127.0.0.1:8000).
-const API_BASE_URL = "";
+const API_BASE_URL = "https://scamlens-7txj.onrender.com";
 
 // State
 let lastScanResult = null;
@@ -166,23 +166,33 @@ function setButtonLoading(btn, isLoading) {
   }
 }
 
+const SCAN_TIMEOUT_MS = 60000;
+const WAKING_MESSAGE =
+  "the scanning server is waking up. Free hosting can take up to a minute after a period of inactivity. Please wait a moment and try again.";
+
 async function postScan(path, payload) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS);
+
   let response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      signal: controller.signal,
     });
   } catch (err) {
     console.error("ScamLens backend unreachable:", API_BASE_URL || "(same origin)", err);
-    throw new Error("the scanning service could not be reached. Please try again later.");
+    throw new Error(err.name === "AbortError" ? WAKING_MESSAGE : "the scanning server could not be reached. Check your connection and try again.");
+  } finally {
+    clearTimeout(timer);
   }
 
   const isJson = (response.headers.get("content-type") || "").includes("application/json");
   if (!isJson) {
-    console.error("ScamLens backend did not return JSON. Check API_BASE_URL in frontend/app.js.");
-    throw new Error("the scanning service is not connected yet.");
+    console.error("ScamLens backend returned a non-JSON response with status", response.status);
+    throw new Error(response.status >= 500 ? WAKING_MESSAGE : "the scanning server returned an unexpected response.");
   }
 
   const data = await response.json();
@@ -190,7 +200,7 @@ async function postScan(path, payload) {
     throw new Error(data.detail || `Server responded with status ${response.status}`);
   }
   if (!data.risk_level || !Array.isArray(data.indicators)) {
-    throw new Error("the scanning service returned an unexpected response.");
+    throw new Error("the scanning server returned an unexpected response.");
   }
   return data;
 }
