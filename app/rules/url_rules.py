@@ -357,6 +357,43 @@ def scan_url_rules(raw_url: str) -> List[Dict[str, Any]]:
             "matched_text": subdomain,
         })
 
+    # 8b. Banking / login terms inside the registered domain name itself
+    domain_tokens = extract_word_tokens(host_info["domain_name"])
+    matched_auth_in_domain = domain_tokens.intersection(SECURITY_CREDENTIAL_TERMS)
+    if matched_auth_in_domain:
+        domain_terms = ", ".join(sorted(matched_auth_in_domain))
+        indicators.append({
+            "id": "URL_DOMAIN_CREDENTIAL_TERMS",
+            "category": "Domain Name Lure",
+            "title": f"Banking / Login Terms in Domain Name ({domain_terms})",
+            "severity": "warning",
+            "weight": 20,
+            "description": (
+                f"The registered domain name ('{registrable_domain}') itself contains banking or credential terms "
+                f"({domain_terms}). Established institutions usually use their own brand name, so generic account or "
+                f"banking words in a domain are a common lure in fake login pages."
+            ),
+            "action": "Do not enter banking or login details. Type the institution's known web address directly instead.",
+            "matched_text": registrable_domain,
+        })
+
+        if matched_auth_in_path:
+            path_terms = ", ".join(sorted(matched_auth_in_path))
+            indicators.append({
+                "id": "URL_DOMAIN_LOGIN_PATH_LURE",
+                "category": "Credential Harvesting Pattern",
+                "title": f"Banking Domain Combined With Login Path ({path_terms})",
+                "severity": "high",
+                "weight": 25,
+                "description": (
+                    f"The domain ('{registrable_domain}') carries banking or credential terms ({domain_terms}) and the "
+                    f"path asks for authentication ({path_terms}). This combination is a typical structure of fake "
+                    f"banking login pages. It is a pattern warning, not proof that this site is malicious."
+                ),
+                "action": "Do not enter passwords, OTPs, or account numbers on this page.",
+                "matched_text": f"{registrable_domain}{path}",
+            })
+
     # 9. Insecure HTTP on Sensitive / Credential Themed Links
     if scheme == "http" and all_matched_auth:
         indicators.append({

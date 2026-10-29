@@ -12,7 +12,8 @@ MESSAGE_RULES: List[Dict[str, Any]] = [
         "patterns": [
             r"\b(?:pay|send|transfer|deposit)\s+(?:a\s+)?(?:refundable\s+)?(?:security|registration|training|application|processing|onboarding|equipment|laptop|verification)\s+fee\b",
             r"\b(?:registration|security|training|application|processing|laptop|equipment)\s+(?:fee|deposit)\s+(?:of|is|required)\b",
-            r"\bpay\s+(?:rs\.?|inr|\$|usd|eur|£)\s*[0-9,]+\s+(?:as|for|towards)\s+(?:a\s+)?(?:fee|deposit|training|kit|laptop|onboarding)\b",
+            r"\bpay\s+(?:₹|rs\.?|inr|\$|usd|eur|£)\s*[0-9,]+\s+(?:as|for|towards)\s+(?:a\s+)?(?:fee|deposit|training|kit|laptop|onboarding)\b",
+            r"\b(?:pay|send|transfer|deposit)\s+(?:₹|rs\.?|inr|\$|usd|eur|£)?\s*[0-9][0-9,.]*\s+(?:as\s+)?(?:a\s+)?(?:processing|claim|handling|release|activation|verification)\s+(?:fee|charge)\b",
             r"\bfee\s+will\s+be\s+refunded\s+(?:after|with|in)\s+(?:first|1st)\s+(?:salary|month|stipend)\b",
             r"\bpay\s+(?:before|prior\s+to)\s+(?:joining|receiving|interview|offer\s+letter|start)\b",
         ],
@@ -24,9 +25,10 @@ MESSAGE_RULES: List[Dict[str, Any]] = [
         "category": "Credential & OTP Harvesting",
         "title": "Request for OTP, PIN, or Sensitive Credentials",
         "severity": "high",
-        "weight": 40,
+        "weight": 60,
         "patterns": [
-            r"\b(?:share|send|provide|give|enter|forward)\s+(?:your\s+)?(?:6-digit\s+|one-time\s+)?(?:otp|pin|cvv|password|passcode|mpin)\b",
+            r"(?<!not )(?<!never )(?<!don't )(?<!ask you to )\b(?:share|send|provide|give|enter|forward|reply\s+with|submit)\s+(?:your\s+)?(?:6-digit\s+|one-time\s+)?(?:otp|pin|cvv|password|passcode|mpin)\b",
+            r"(?<!not )(?<!never )(?<!don't )(?<!ask you to )\b(?:provide|share|send|submit|confirm|reply\s+with|give|forward|enter)\b.{0,80}\b(?:upi\s+pin|atm\s+pin|card\s+pin|mpin|otp|one[- ]time\s+password|cvv|cvc|password|passcode|bank\s+account\s+(?:details|number)|account\s+number|card\s+details|net\s*banking\s+(?:password|login|details))\b",
             r"\botp\s+(?:sent\s+to\s+your\s+mobile|verification\s+code|received\s+on\s+phone)\b",
             r"\bverify\s+(?:your\s+)?(?:bank\s+account|card|credentials|password)\s+by\s+(?:replying|sending)\b",
             r"\bdo\s+not\s+share\s+this\s+otp\s+with\s+anyone\s+except\b",
@@ -41,7 +43,7 @@ MESSAGE_RULES: List[Dict[str, Any]] = [
         "severity": "high",
         "weight": 35,
         "patterns": [
-            r"\b(?:congratulations|congrats|winner|selected)\b.{0,60}\b(?:won|awarded|chosen\s+for)\b.{0,40}(?:prize|lottery|jackpot|cash\s+reward|sweepstake|\$|rs\.?|inr|crore|lakh)",
+            r"\b(?:congratulations|congrats|winner|selected)\b.{0,60}\b(?:won|awarded|chosen\s+for)\b.{0,40}(?:prize|lottery|lucky\s+draw|jackpot|cash\s+reward|sweepstake|\$|₹|rs\.?|inr|crore|lakh)",
             r"\b(?:lucky\s+draw|mega\s+jackpot|international\s+lottery|kbc\s+lottery)\b",
             r"\bclaim\s+(?:your\s+)?(?:prize|reward|winnings|jackpot)\s+(?:by|within|now|today)\b",
             r"\byou\s+have\s+been\s+selected\s+as\s+the\s+(?:lucky\s+)?winner\b",
@@ -62,9 +64,24 @@ MESSAGE_RULES: List[Dict[str, Any]] = [
             r"\bact\s+now\s+or\s+(?:legal|police|arrest|court)\s+(?:action|notice|warrant)\b",
             r"\bfinal\s+(?:warning|notice|reminder)\s+(?:before|to\s+avoid)\b",
             r"\burgent\s+action\s+required\b",
+            r"\bwithin\s+\d+\s*(?:minutes?|mins?)\b",
+            r"\b(?:failure|fail|failing)\s+to\s+(?:respond|reply|verify|comply|act|pay)\b.{0,60}\b(?:cancel|cancelled|suspend|suspended|block|blocked|forfeit|terminate|void|lost)\b",
         ],
         "description": "Manufactures panic using artificial deadlines or threats of service disconnection/legal action. Urgency is designed to prevent you from calmly verifying the claim.",
         "action": "Pause and breathe. Contact the official institution directly through their verified website or public phone number, not the contact details in the message.",
+    },
+    {
+        "id": "MSG_FAKE_REFUND_BAIT",
+        "category": "Fake Refund or Payment Bait",
+        "title": "Pending Refund Used to Extract Account Details",
+        "severity": "warning",
+        "weight": 25,
+        "patterns": [
+            r"\b(?:refund|reimbursement|cashback)\b.{0,80}\b(?:pending|on\s+hold|failed|unclaimed|awaiting)\b",
+            r"\b(?:to\s+receive|to\s+claim|to\s+release)\s+your\s+(?:money|refund|payment|funds)\b",
+        ],
+        "description": "Promises money that is supposedly waiting, such as a pending refund, then asks for account details or a deadline to release it. Real refunds are credited automatically and never require you to disclose banking secrets.",
+        "action": "Do not reply to or click links for a refund. Check the refund status directly in your bank or merchant app or on its official website.",
     },
     {
         "id": "MSG_OFF_PLATFORM",
@@ -177,4 +194,23 @@ def scan_message_rules(text: str) -> List[Dict[str, Any]]:
                 })
                 break
 
+    detected_indicators.extend(_compound_indicators(detected_indicators))
     return detected_indicators
+
+
+def _compound_indicators(detected: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Adds indicators only when several warning signs appear together in one message."""
+    by_id = {i["id"]: i for i in detected}
+    compounds: List[Dict[str, Any]] = []
+    if "MSG_LOTTERY_PRIZE" in by_id and "MSG_UPFRONT_FEE" in by_id:
+        compounds.append({
+            "id": "MSG_PRIZE_FEE_COMBO",
+            "category": "Compound Prize Scam Pattern",
+            "title": "Prize Win Combined With an Advance Payment Demand",
+            "severity": "high",
+            "weight": 25,
+            "description": "The message claims you won a prize and asks you to pay a fee to receive it. This combination is the classic advance-fee prize scam: the fee is the only thing the scammer ever collects.",
+            "action": "Do not pay any processing or claim fee. Genuine prizes are never released in exchange for an upfront payment.",
+            "matched_text": by_id["MSG_UPFRONT_FEE"]["matched_text"],
+        })
+    return compounds

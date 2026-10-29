@@ -15,6 +15,11 @@ from app.rules.url_rules import scan_url_rules
 #                  High-risk compound patterns identified (e.g., brand-impersonation + login terms,
 #                  upfront fee demands, OTP harvesting, raw IP hosting, or dangerous URI schemes).
 # -----------------------------------------------------------
+# Each matched indicator contributes its rule weight; the total is capped at 100.
+# Credential requests (OTP, UPI PIN, password, CVV, bank details) weigh 60, so one
+# clear request reaches "Suspicious" on its own. Compound signals (prize + fee,
+# banking domain + login path) add weight only when their components co-occur.
+# -----------------------------------------------------------
 
 MESSAGE_LIMITATIONS: List[str] = [
     "Rule-based detection identifies heuristic risk patterns; it does not constitute definitive proof of fraud or legitimacy.",
