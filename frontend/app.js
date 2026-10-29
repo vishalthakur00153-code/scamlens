@@ -20,6 +20,10 @@ const SAMPLE_URLS = {
   legit_url: "https://internshala.com/internships",
 };
 
+// URL of the hosted ScamLens Python backend, e.g. "https://scamlens-api.onrender.com".
+// Leave empty when the Python server itself serves this page (e.g. http://127.0.0.1:8000).
+const API_BASE_URL = "";
+
 // State
 let lastScanResult = null;
 
@@ -162,6 +166,35 @@ function setButtonLoading(btn, isLoading) {
   }
 }
 
+async function postScan(path, payload) {
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.error("ScamLens backend unreachable:", API_BASE_URL || "(same origin)", err);
+    throw new Error("the scanning service could not be reached. Please try again later.");
+  }
+
+  const isJson = (response.headers.get("content-type") || "").includes("application/json");
+  if (!isJson) {
+    console.error("ScamLens backend did not return JSON. Check API_BASE_URL in frontend/app.js.");
+    throw new Error("the scanning service is not connected yet.");
+  }
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.detail || `Server responded with status ${response.status}`);
+  }
+  if (!data.risk_level || !Array.isArray(data.indicators)) {
+    throw new Error("the scanning service returned an unexpected response.");
+  }
+  return data;
+}
+
 function setupScanActions() {
   scanMessageBtn.addEventListener("click", async () => {
     const text = messageInput.value.trim();
@@ -174,18 +207,7 @@ function setupScanActions() {
     setButtonLoading(scanMessageBtn, true);
 
     try {
-      const response = await fetch("/api/scan/message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.detail || `Server responded with status ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = await postScan("/api/scan/message", { text });
       displayResults(result);
     } catch (err) {
       showError(`Analysis failed: ${err.message}`);
@@ -205,18 +227,7 @@ function setupScanActions() {
     setButtonLoading(scanUrlBtn, true);
 
     try {
-      const response = await fetch("/api/scan/url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.detail || `Server responded with status ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = await postScan("/api/scan/url", { url });
       displayResults(result);
     } catch (err) {
       showError(`Analysis failed: ${err.message}`);
